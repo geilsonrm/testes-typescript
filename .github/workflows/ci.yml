@@ -23,10 +23,16 @@ jobs:
         node-version: ${{ matrix.node-version }}
         
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       
     - name: Build TypeScript
       run: npm run build
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
 
   deploy-test:
     needs: build
@@ -36,22 +42,35 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist
+    
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '20.x'
     
     - name: Install dependencies
-      run: npm install
+      run: npm ci
     
-    - name: Build
-      run: npm run build
-    
-    - name: Setup SSH
+    - name: Setup SSH and Deploy
+      env:
+        TEST_SSH_KEY: ${{ secrets.TEST_SSH_KEY }}
       run: |
+        if [ -z "$TEST_SSH_KEY" ]; then
+          echo "Error: TEST_SSH_KEY secret is not set"
+          exit 1
+        fi
+        
+        # Configurar SSH
         mkdir -p ~/.ssh/
-        echo "${{ secrets.TEST_SSH_KEY }}" > ~/.ssh/deploy_key
+        echo "$TEST_SSH_KEY" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
+        
+        # Configurar SSH com StrictHostKeyChecking no
         cat >>~/.ssh/config <<END
         Host raspberry
           HostName 187.115.149.13
@@ -60,21 +79,27 @@ jobs:
           IdentityFile ~/.ssh/deploy_key
           StrictHostKeyChecking no
         END
-    
-    - name: Deploy to Raspberry Pi
-      run: |
-        # Criar diretório se não existir
+        
+        # Testar conexão SSH
+        if ! ssh raspberry "echo 'SSH connection successful'"; then
+          echo "Error: Failed to connect to Raspberry Pi"
+          exit 1
+        fi
+        
+        # Criar diretório da aplicação se não existir
         ssh raspberry 'mkdir -p ~/app'
         
-        # Copiar arquivos
+        # Deploy apenas dos arquivos necessários
         rsync -avz --delete \
-          --exclude '.git' \
-          --exclude 'node_modules' \
+          --include='package*.json' \
+          --include='dist/***' \
+          --include='tsconfig.json' \
+          --exclude='*' \
           ./ raspberry:~/app/
         
-        # Instalar dependências e reiniciar aplicação
+        # Instalar dependências de produção e reiniciar
         ssh raspberry 'cd ~/app && \
-          npm install && \
+          npm ci --only=production && \
           pm2 delete app || true && \
           pm2 start dist/index.js --name app'
 
@@ -86,16 +111,19 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist
+    
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '20.x'
     
     - name: Install dependencies
-      run: npm install
-    
-    - name: Build
-      run: npm run build
+      run: npm ci
     
     - name: Deploy to Production
       run: |
