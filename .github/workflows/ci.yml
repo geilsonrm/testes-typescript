@@ -65,11 +65,16 @@ jobs:
         key: ${{ secrets.TEST_SSH_KEY }}
         script: |
           # Preparar diretório
-          mkdir -p ~/app
+          mkdir -p ~/app/logs
           rm -rf ~/app/*
+          mkdir -p ~/app/logs
           
-          # Garantir que PM2 está instalado
+          # Garantir que PM2 está instalado globalmente
           npm install -g pm2
+          
+          # Limpar logs antigos do PM2
+          pm2 flush
+          
           echo "Ambiente preparado"
     
     - name: Sync files
@@ -92,28 +97,34 @@ jobs:
         key: ${{ secrets.TEST_SSH_KEY }}
         script: |
           cd ~/app
+          
+          # Instalar dependências
           npm ci --only=production
           
-          # Parar aplicação existente
+          # Parar qualquer instância anterior
           pm2 delete app || true
           
-          # Iniciar com configurações específicas
+          # Limpar logs antigos
+          rm -f ~/.pm2/logs/app-*.log
+          
+          # Iniciar aplicação com PM2
           pm2 start dist/index.js \
             --name app \
-            --log ~/app/logs/app.log \
+            --log ~/.pm2/logs/app.log \
+            --error ~/.pm2/logs/app-error.log \
             --time \
-            --no-autorestart \
-            --exp-backoff-restart-delay=100
+            --watch \
+            --max-memory-restart 100M
           
-          # Salvar configuração do PM2
+          # Salvar configuração
           pm2 save
           
-          # Mostrar status
-          pm2 status
+          echo "Status da aplicação:"
+          pm2 list
           
-          # Mostrar logs iniciais
-          sleep 2
-          tail -n 20 ~/app/logs/app.log || true
+          echo "Últimos logs:"
+          sleep 3
+          pm2 logs app --lines 10 || true
 
   deploy-prod:
     needs: build
