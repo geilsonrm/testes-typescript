@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+      "module": "commonjs",
+      "target": "es2015",
+      "skipLibCheck": true /* Skip type checking of declaration files. */,
+      "declaration": true,
+      "outDir": "./dist"
+  },
+  "include": [
+      "src/**/*"
+  ]
+}
