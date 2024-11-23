@@ -23,10 +23,10 @@ function logStatus() {
 logStatus();
 
 // Log a cada 3 segundos
-// setInterval(logStatus, 3000);
-console.log(`\nTeste:\n`, 1);
+setInterval(logStatus, 5000);
+console.log(`\nTeste:\n`, 2);
 
-setTimeout(logStatus, 5000);
+// setTimeout(logStatus, 5000);
 
 
 // Tratamento de erros
