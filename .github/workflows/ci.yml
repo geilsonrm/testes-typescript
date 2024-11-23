@@ -56,52 +56,43 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Setup SSH and Deploy
-      env:
-        TEST_SSH_KEY: ${{ secrets.TEST_SSH_KEY }}
-      run: |
-        if [ -z "$TEST_SSH_KEY" ]; then
-          echo "Error: TEST_SSH_KEY secret is not set"
-          exit 1
-        fi
-        
-        # Configurar SSH
-        mkdir -p ~/.ssh/
-        echo "$TEST_SSH_KEY" > ~/.ssh/deploy_key
-        chmod 600 ~/.ssh/deploy_key
-        
-        # Configurar SSH com StrictHostKeyChecking no
-        cat >>~/.ssh/config <<END
-        Host raspberry
-          HostName 187.115.149.13
-          User geilsonrm
-          Port 8086
-          IdentityFile ~/.ssh/deploy_key
-          StrictHostKeyChecking no
-        END
-        
-        # Testar conexão SSH
-        if ! ssh raspberry "echo 'SSH connection successful'"; then
-          echo "Error: Failed to connect to Raspberry Pi"
-          exit 1
-        fi
-        
-        # Criar diretório da aplicação se não existir
-        ssh raspberry 'mkdir -p ~/app'
-        
-        # Deploy apenas dos arquivos necessários
-        rsync -avz --delete \
-          --include='package*.json' \
-          --include='dist/***' \
-          --include='tsconfig.json' \
-          --exclude='*' \
-          ./ raspberry:~/app/
-        
-        # Instalar dependências de produção e reiniciar
-        ssh raspberry 'cd ~/app && \
-          npm ci --only=production && \
-          pm2 delete app || true && \
-          pm2 start dist/index.js --name app'
+    - name: Deploy with SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 187.115.149.13
+        username: geilsonrm
+        port: 8086
+        key: ${{ secrets.TEST_SSH_KEY }}
+        script: |
+          # Preparar diretório
+          mkdir -p ~/app
+          rm -rf ~/app/*
+          echo "Diretório preparado"
+    
+    - name: Sync files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 187.115.149.13
+        username: geilsonrm
+        port: 8086
+        key: ${{ secrets.TEST_SSH_KEY }}
+        source: "dist/,package.json,package-lock.json"
+        target: "~/app"
+        strip_components: 0
+    
+    - name: Start Application
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 187.115.149.13
+        username: geilsonrm
+        port: 8086
+        key: ${{ secrets.TEST_SSH_KEY }}
+        script: |
+          cd ~/app
+          npm ci --only=production
+          pm2 delete app || true
+          pm2 start dist/index.js --name app
+          echo "Aplicação iniciada com PM2"
 
   deploy-prod:
     needs: build
