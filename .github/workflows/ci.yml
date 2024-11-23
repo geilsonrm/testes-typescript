@@ -72,6 +72,9 @@ jobs:
           # Garantir que PM2 está instalado globalmente
           npm install -g pm2
           
+          # Configurar PM2 para iniciar com o sistema
+          pm2 startup | tail -n 1 | bash || true
+          
           # Limpar logs antigos do PM2
           pm2 flush
           
@@ -114,13 +117,18 @@ jobs:
             --error ~/.pm2/logs/app-error.log \
             --time \
             --watch \
-            --max-memory-restart 100M
+            --max-memory-restart 100M \
+            --restart-delay 3000 \
+            --exp-backoff-restart-delay=1000
           
-          # Salvar configuração
+          # Salvar configuração para persistir após reboot
           pm2 save
           
           echo "Status da aplicação:"
           pm2 list
+          
+          echo "Verificando startup script:"
+          pm2 startup list
           
           echo "Últimos logs:"
           sleep 3

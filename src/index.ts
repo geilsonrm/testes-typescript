@@ -23,7 +23,11 @@ function logStatus() {
 logStatus();
 
 // Log a cada 3 segundos
-setInterval(logStatus, 3000);
+// setInterval(logStatus, 3000);
+console.log(`\nTeste:\n`, 1);
+
+setTimeout(logStatus, 5000);
+
 
 // Tratamento de erros
 process.on('uncaughtException', (error) => {
