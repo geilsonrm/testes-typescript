@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x, 18.x]
+        node-version: [16.x, 18.x, 20.x]
 
     steps:
     - uses: actions/checkout@v3
@@ -26,7 +26,7 @@ jobs:
       run: npm install
       
     - name: Build TypeScript
-      run: npm run tsc
+      run: npm run build
 
   deploy-test:
     needs: build
@@ -39,7 +39,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18.x'
+        node-version: '20.x'
     
     - name: Install dependencies
       run: npm install
@@ -47,14 +47,36 @@ jobs:
     - name: Build
       run: npm run build
     
-    - name: Deploy to Test
+    - name: Setup SSH
       run: |
-        echo "Deploy to test server will be configured here"
-        # Aqui será adicionada a configuração de deploy para o servidor de teste
-        # Exemplo de possíveis passos:
-        # - Configuração de SSH
-        # - Transferência de arquivos
-        # - Restart do servidor
+        mkdir -p ~/.ssh/
+        echo "${{ secrets.TEST_SSH_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        cat >>~/.ssh/config <<END
+        Host raspberry
+          HostName 187.115.149.13
+          User geilsonrm
+          Port 8086
+          IdentityFile ~/.ssh/deploy_key
+          StrictHostKeyChecking no
+        END
+    
+    - name: Deploy to Raspberry Pi
+      run: |
+        # Criar diretório se não existir
+        ssh raspberry 'mkdir -p ~/app'
+        
+        # Copiar arquivos
+        rsync -avz --delete \
+          --exclude '.git' \
+          --exclude 'node_modules' \
+          ./ raspberry:~/app/
+        
+        # Instalar dependências e reiniciar aplicação
+        ssh raspberry 'cd ~/app && \
+          npm install && \
+          pm2 delete app || true && \
+          pm2 start dist/index.js --name app'
 
   deploy-prod:
     needs: build
@@ -67,7 +89,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18.x'
+        node-version: '20.x'
     
     - name: Install dependencies
       run: npm install
@@ -78,8 +100,4 @@ jobs:
     - name: Deploy to Production
       run: |
         echo "Deploy to production server will be configured here"
-        # Aqui será adicionada a configuração de deploy para o servidor de produção
-        # Exemplo de possíveis passos:
-        # - Configuração de SSH
-        # - Transferência de arquivos
-        # - Restart do servidor
+        # Configuração futura para produção
