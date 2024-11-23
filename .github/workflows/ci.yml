@@ -67,7 +67,10 @@ jobs:
           # Preparar diretório
           mkdir -p ~/app
           rm -rf ~/app/*
-          echo "Diretório preparado"
+          
+          # Garantir que PM2 está instalado
+          npm install -g pm2
+          echo "Ambiente preparado"
     
     - name: Sync files
       uses: appleboy/scp-action@v0.1.4
@@ -90,9 +93,27 @@ jobs:
         script: |
           cd ~/app
           npm ci --only=production
+          
+          # Parar aplicação existente
           pm2 delete app || true
-          pm2 start dist/index.js --name app
-          echo "Aplicação iniciada com PM2"
+          
+          # Iniciar com configurações específicas
+          pm2 start dist/index.js \
+            --name app \
+            --log ~/app/logs/app.log \
+            --time \
+            --no-autorestart \
+            --exp-backoff-restart-delay=100
+          
+          # Salvar configuração do PM2
+          pm2 save
+          
+          # Mostrar status
+          pm2 status
+          
+          # Mostrar logs iniciais
+          sleep 2
+          tail -n 20 ~/app/logs/app.log || true
 
   deploy-prod:
     needs: build
