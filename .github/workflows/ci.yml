@@ -1,10 +1,10 @@
-name: TypeScript CI
+name: TypeScript CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
   build:
@@ -27,3 +27,59 @@ jobs:
       
     - name: Build TypeScript
       run: npm run tsc
+
+  deploy-test:
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Deploy to Test
+      run: |
+        echo "Deploy to test server will be configured here"
+        # Aqui será adicionada a configuração de deploy para o servidor de teste
+        # Exemplo de possíveis passos:
+        # - Configuração de SSH
+        # - Transferência de arquivos
+        # - Restart do servidor
+
+  deploy-prod:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Deploy to Production
+      run: |
+        echo "Deploy to production server will be configured here"
+        # Aqui será adicionada a configuração de deploy para o servidor de produção
+        # Exemplo de possíveis passos:
+        # - Configuração de SSH
+        # - Transferência de arquivos
+        # - Restart do servidor
